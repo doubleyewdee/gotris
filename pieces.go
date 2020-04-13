@@ -9,36 +9,6 @@ func (point *Point) Add(offset Point) Point {
 }
 
 type Piece [4]Point
-type BagOfPieces struct {
-	pieces []Piece
-	order  []int
-	next   int
-}
-
-func NewBagOfPieces() *BagOfPieces {
-	pieces := []Piece{pieceLongBoi, pieceL, pieceInvertedL, pieceZ, pieceInvertedZ, pieceBlock, pieceTBoi}
-	order := []int{0, 1, 2, 3, 4, 5, 6}
-
-	return &BagOfPieces{pieces: pieces, order: order, next: len(order)}
-}
-
-func (bag *BagOfPieces) NextPiece() *Piece {
-	if bag.next == len(bag.order) {
-		// re-shuffle
-		for i := len(bag.order) - 1; i > 0; i-- {
-			j := rand.Intn(i)
-			if j != i {
-				bag.order[i], bag.order[j] = bag.order[j], bag.order[i]
-			}
-		}
-
-		bag.next = 0
-	}
-
-	piece := &bag.pieces[bag.order[bag.next]]
-	bag.next++
-	return piece
-}
 
 // --X-
 // --X-
@@ -82,4 +52,35 @@ func (piece *Piece) RotatePiece(clockwise bool) *Piece {
 		}
 	}
 	return rotated
+}
+
+type BagOfPieces struct {
+	pieces []Piece
+	order  []int
+	next   int
+}
+
+func NewBagOfPieces() *BagOfPieces {
+	pieces := []Piece{pieceLongBoi, pieceL, pieceInvertedL, pieceZ, pieceInvertedZ, pieceBlock, pieceTBoi}
+	order := []int{0, 1, 2, 3, 4, 5, 6}
+
+	return &BagOfPieces{pieces: pieces, order: order, next: len(order)}
+}
+
+func (bag *BagOfPieces) NextPiece() *Piece {
+	if bag.next == len(bag.order) {
+		// re-shuffle
+		for i := len(bag.order) - 1; i > 0; i-- {
+			j := rand.Intn(i)
+			if j != i {
+				bag.order[i], bag.order[j] = bag.order[j], bag.order[i]
+			}
+		}
+
+		bag.next = 0
+	}
+
+	piece := &bag.pieces[bag.order[bag.next]]
+	bag.next++
+	return piece
 }
