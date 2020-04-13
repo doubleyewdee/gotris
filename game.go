@@ -31,6 +31,8 @@ type Game struct {
 	pieceGenerator BagOfPieces
 	currentPiece   *Piece
 	piecePosition  Point
+	advanceSpeed   time.Duration
+	lastAdvanced   time.Time
 }
 
 func NewGame(screen tcell.Screen) Game {
@@ -41,6 +43,7 @@ func NewGame(screen tcell.Screen) Game {
 	g.command = make(chan int)
 	g.boardArea.Height = BOARD_HEIGHT
 	g.boardArea.Width = BOARD_WIDTH * DRAWN_CELL_WIDTH
+	g.advanceSpeed = time.Second
 
 	return *g
 }
@@ -58,6 +61,21 @@ func (game *Game) Run() {
 
 	go game.getInput()
 	for {
+		now := time.Now()
+		advanceTime := time.Second
+		if game.currentPiece != nil {
+			advanceTime = game.advanceSpeed - now.Sub(game.lastAdvanced)
+			if advanceTime <= 0 {
+				if !game.tryMovePiece(Point{0, 1}) {
+					// trying to move a piece down again if you can't means setting the piece
+					game.lockPiece()
+				} else {
+					game.lastAdvanced = now
+				}
+				continue
+			}
+		}
+
 		select {
 		case cmd := <-game.command:
 			switch cmd {
@@ -75,10 +93,12 @@ func (game *Game) Run() {
 				if !game.tryMovePiece(Point{0, 1}) {
 					// trying to move a piece down again if you can't means setting the piece
 					game.lockPiece()
+				} else {
+					game.lastAdvanced = now
 				}
 			}
 			lastCommand = cmd
-		case <-time.After(time.Millisecond * 1000):
+		case <-time.After(advanceTime):
 			game.writeMsg("lc:%v, dc:%v, piece:%v, pos:%v",
 				lastCommand,
 				drawCount,
@@ -134,6 +154,7 @@ func (game *Game) tryAddPiece() bool {
 
 	game.currentPiece = piece
 	game.piecePosition = position
+	game.lastAdvanced = time.Now()
 	return true
 }
 
