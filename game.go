@@ -14,6 +14,7 @@ var EMPTY_COLOR = tcell.NewRGBColor(0, 0, 0)
 
 const (
 	COMMAND_QUIT = iota
+	COMMAND_NEW_GAME
 	COMMAND_ROTATE
 	COMMAND_ROTATE_COUNTER
 	COMMAND_LEFT
@@ -22,19 +23,21 @@ const (
 )
 
 type Game struct {
-	screen        tcell.Screen
-	board         Board
-	command       chan int
-	boardArea     struct{ X, Y, Width, Height int }
-	currentPiece  *Piece
-	piecePosition Point
-	messageLine   int
+	screen         tcell.Screen
+	board          Board
+	command        chan int
+	boardArea      struct{ X, Y, Width, Height int }
+	messageLine    int
+	pieceGenerator BagOfPieces
+	currentPiece   *Piece
+	piecePosition  Point
 }
 
 func NewGame(screen tcell.Screen) Game {
 	g := new(Game)
 	g.screen = screen
 	g.board = *NewBoard()
+	g.pieceGenerator = *NewBagOfPieces()
 	g.command = make(chan int)
 	g.boardArea.Height = BOARD_HEIGHT
 	g.boardArea.Width = BOARD_WIDTH * DRAWN_CELL_WIDTH
@@ -60,6 +63,8 @@ func (game *Game) Run() {
 			switch cmd {
 			case COMMAND_QUIT:
 				return
+			case COMMAND_NEW_GAME:
+				game.board = *NewBoard()
 			case COMMAND_ROTATE:
 				game.tryRotatePiece()
 			case COMMAND_LEFT:
@@ -79,11 +84,12 @@ func (game *Game) Run() {
 				drawCount,
 				game.currentPiece,
 				game.piecePosition)
+			//game.command <- COMMAND_DOWN
 		}
 
 		if game.currentPiece == nil && !game.tryAddPiece() {
 			game.writeMsg("Game over man, game over!")
-			return
+			continue
 		}
 
 		drawCount++
@@ -93,6 +99,10 @@ func (game *Game) Run() {
 }
 
 func (game *Game) tryRotatePiece() bool {
+	if game.currentPiece == nil {
+		return false
+	}
+
 	piece := game.currentPiece.RotatePiece(true)
 
 	ret := game.board.PlacePiece(*piece, game.piecePosition)
@@ -117,7 +127,8 @@ func (game *Game) tryRotatePiece() bool {
 
 func (game *Game) tryAddPiece() bool {
 	piece, position := new(Piece), Point{BOARD_WIDTH / 2, 0}
-	*piece = pieceLongBoi
+	game.writeMsg("%v", game.pieceGenerator.order)
+	piece = game.pieceGenerator.NextPiece()
 	if valid, shift := game.board.isPiecePositionValid(*piece, position); !valid {
 		position = Point{position.X + shift.X, position.Y + shift.Y}
 	}
@@ -131,6 +142,10 @@ func (game *Game) tryAddPiece() bool {
 }
 
 func (game *Game) tryMovePiece(offset Point) bool {
+	if game.currentPiece == nil {
+		return false
+	}
+
 	newPosition := game.piecePosition.Add(offset)
 	if valid, _ := game.board.isPiecePositionValid(*game.currentPiece, newPosition); valid &&
 		!game.board.isPiecePositionOverlapped(*game.currentPiece, newPosition) {
@@ -142,6 +157,10 @@ func (game *Game) tryMovePiece(offset Point) bool {
 }
 
 func (game *Game) lockPiece() {
+	if game.currentPiece == nil {
+		return
+	}
+
 	game.board.LockPiece(*game.currentPiece, game.piecePosition)
 	game.currentPiece = nil
 }
@@ -174,6 +193,8 @@ func (game *Game) getInput() {
 				game.command <- COMMAND_DOWN
 			case tcell.KeyRune:
 				switch unicode.ToLower(event.Rune()) {
+				case 'n':
+					game.command <- COMMAND_NEW_GAME
 				case 'q':
 					game.command <- COMMAND_QUIT
 				case 'r':

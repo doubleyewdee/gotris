@@ -2,7 +2,9 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
+	"time"
 
 	"github.com/gdamore/tcell"
 )
@@ -14,6 +16,7 @@ func main() {
 		os.Exit(-1)
 	}
 
+	rand.Seed(time.Now().UnixNano())
 	g := NewGame(screen)
 	g.Run()
 
