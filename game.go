@@ -108,18 +108,15 @@ func (game *Game) tryRotatePiece() bool {
 	ret := game.board.PlacePiece(*piece, game.piecePosition)
 	switch ret {
 	case PIECE_VALID:
-		game.writeMsg("rotated:%v, valid", piece)
 		game.currentPiece = piece
 	case PIECE_INVALID:
 		_, shift := game.board.isPiecePositionValid(*piece, game.piecePosition)
-		game.writeMsg("shift:%v", shift)
 		newPosition := Point{game.piecePosition.X + shift.X, game.piecePosition.Y + shift.Y}
 		if game.board.PlacePiece(*piece, newPosition) == PIECE_VALID {
 			game.piecePosition = newPosition
 			game.currentPiece = piece
 		}
 	default:
-		game.writeMsg("rotated:%v, invalid, ret:%v", piece, ret)
 		return false
 	}
 	return true
@@ -127,7 +124,6 @@ func (game *Game) tryRotatePiece() bool {
 
 func (game *Game) tryAddPiece() bool {
 	piece, position := new(Piece), Point{BOARD_WIDTH / 2, 0}
-	game.writeMsg("%v", game.pieceGenerator.order)
 	piece = game.pieceGenerator.NextPiece()
 	if valid, shift := game.board.isPiecePositionValid(*piece, position); !valid {
 		position = Point{position.X + shift.X, position.Y + shift.Y}
@@ -207,7 +203,7 @@ func (game *Game) getInput() {
 
 const (
 	BLOCK_CHAR = '\u2592'
-	EMPTY_CHAR = '-'
+	EMPTY_CHAR = '\u0000'
 )
 
 func (game *Game) draw() {
