@@ -47,12 +47,46 @@ func (board *Board) PlacePiece(piece Piece, position Point) int {
 
 // locks all intersecting spots on the board for the given piece
 func (board *Board) LockPiece(piece Piece, position Point) {
+	topY, bottomY := BOARD_HEIGHT, 0
+
 	locker := func(point Point) {
 		cell := board.cellAt(point)
 		cell.Locked = true
+		if point.Y < topY {
+			topY = point.Y
+		}
+		if point.Y > bottomY {
+			bottomY = point.Y
+		}
 	}
 
 	board.intersectPiece(piece, position, locker)
+
+	sweepLine := bottomY
+	for sweepLine >= topY {
+		cleared := true
+		for _, cell := range board.Cells[sweepLine] {
+			if !cell.Locked {
+				cleared = false
+				break
+			}
+		}
+
+		if cleared {
+			board.ClearLine(sweepLine)
+			topY--
+		} else {
+			sweepLine--
+		}
+	}
+}
+
+// clears a line (woo!) and shifts all the lines above down
+func (board *Board) ClearLine(line int) {
+	for l := line; l > 0; l-- {
+		board.Cells[l] = board.Cells[l-1]
+	}
+	board.Cells[0] = make([]Cell, BOARD_WIDTH)
 }
 
 // returns whether the piece's position is valid (within the board's bounds), and if not, what change to position would
