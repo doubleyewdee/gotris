@@ -80,7 +80,11 @@ func (bag *BagOfPieces) NextPiece() *Piece {
 		bag.next = 0
 	}
 
-	piece := &bag.pieces[bag.order[bag.next]]
+	return &bag.pieces[bag.order[bag.next]]
+}
+
+func (bag *BagOfPieces) TakeNextPiece() *Piece {
+	ret := bag.NextPiece()
 	bag.next++
-	return piece
+	return ret
 }

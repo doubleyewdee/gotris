@@ -20,6 +20,7 @@ const (
 	COMMAND_LEFT
 	COMMAND_RIGHT
 	COMMAND_DOWN
+	COMMAND_PLUMMET
 )
 
 type Game struct {
@@ -43,7 +44,7 @@ func NewGame(screen tcell.Screen) Game {
 	g.command = make(chan int)
 	g.boardArea.Height = BOARD_HEIGHT
 	g.boardArea.Width = BOARD_WIDTH * DRAWN_CELL_WIDTH
-	g.advanceSpeed = time.Second
+	g.advanceSpeed = time.Second / 3
 
 	return *g
 }
@@ -66,12 +67,7 @@ func (game *Game) Run() {
 		if game.currentPiece != nil {
 			advanceTime = game.advanceSpeed - now.Sub(game.lastAdvanced)
 			if advanceTime <= 0 {
-				if !game.tryMovePiece(Point{0, 1}) {
-					// trying to move a piece down again if you can't means setting the piece
-					game.lockPiece()
-				} else {
-					game.lastAdvanced = now
-				}
+				game.advancePiece(now)
 				continue
 			}
 		}
@@ -83,28 +79,32 @@ func (game *Game) Run() {
 				return
 			case COMMAND_NEW_GAME:
 				game.board = *NewBoard()
+				game.currentPiece = nil
 			case COMMAND_ROTATE:
-				game.tryRotatePiece()
+				// we allow spinning indefinitely if the piece would otherwise lock by resetting the advance timer if we succeed
+				// in rotating the piece and it can't go further down
+				// this is still probably not quite right as it theoretically allows you to spin a piece forever and block the game but like
+				// ... why would you?
+				if canAdvance, _ := game.canMovePiece(Point{0, 1}); game.tryRotatePiece() && !canAdvance {
+					game.lastAdvanced = now
+				}
 			case COMMAND_LEFT:
 				game.tryMovePiece(Point{-1, 0})
 			case COMMAND_RIGHT:
 				game.tryMovePiece(Point{1, 0})
 			case COMMAND_DOWN:
-				if !game.tryMovePiece(Point{0, 1}) {
-					// trying to move a piece down again if you can't means setting the piece
-					game.lockPiece()
-				} else {
-					game.lastAdvanced = now
+				game.advancePiece(now)
+			case COMMAND_PLUMMET:
+				for game.advancePiece(now) {
 				}
 			}
 			lastCommand = cmd
-		case <-time.After(advanceTime):
+		case <-time.After(advanceTime / 5):
 			game.writeMsg("lc:%v, dc:%v, piece:%v, pos:%v",
 				lastCommand,
 				drawCount,
 				game.currentPiece,
 				game.piecePosition)
-			//game.command <- COMMAND_DOWN
 		}
 
 		if game.currentPiece == nil && !game.tryAddPiece() {
@@ -144,7 +144,7 @@ func (game *Game) tryRotatePiece() bool {
 
 func (game *Game) tryAddPiece() bool {
 	piece, position := new(Piece), Point{BOARD_WIDTH / 2, 0}
-	piece = game.pieceGenerator.NextPiece()
+	piece = game.pieceGenerator.TakeNextPiece()
 	if valid, shift := game.board.isPiecePositionValid(*piece, position); !valid {
 		position = Point{position.X + shift.X, position.Y + shift.Y}
 	}
@@ -158,14 +158,22 @@ func (game *Game) tryAddPiece() bool {
 	return true
 }
 
-func (game *Game) tryMovePiece(offset Point) bool {
+func (game *Game) canMovePiece(offset Point) (bool, Point) {
 	if game.currentPiece == nil {
-		return false
+		return false, game.piecePosition
 	}
 
 	newPosition := game.piecePosition.Add(offset)
 	if valid, _ := game.board.isPiecePositionValid(*game.currentPiece, newPosition); valid &&
 		!game.board.isPiecePositionOverlapped(*game.currentPiece, newPosition) {
+		return true, newPosition
+	}
+
+	return false, game.piecePosition
+}
+
+func (game *Game) tryMovePiece(offset Point) bool {
+	if valid, newPosition := game.canMovePiece(offset); valid {
 		game.piecePosition = newPosition
 		return true
 	}
@@ -180,6 +188,18 @@ func (game *Game) lockPiece() {
 
 	game.board.LockPiece(*game.currentPiece, game.piecePosition)
 	game.currentPiece = nil
+}
+
+// returns ture if the piece was advanced down, false if we had to lock the piece
+func (game *Game) advancePiece(advanceTime time.Time) bool {
+	if !game.tryMovePiece(Point{0, 1}) {
+		// trying to move a piece down again if you can't means setting the piece
+		game.lockPiece()
+		return false
+	}
+
+	game.lastAdvanced = advanceTime
+	return true
 }
 
 func (game *Game) setLayout() {
@@ -208,8 +228,12 @@ func (game *Game) getInput() {
 				game.command <- COMMAND_RIGHT
 			case tcell.KeyDown:
 				game.command <- COMMAND_DOWN
+			case tcell.KeyUp:
+				game.command <- COMMAND_PLUMMET
 			case tcell.KeyRune:
 				switch unicode.ToLower(event.Rune()) {
+				case ' ':
+					game.command <- COMMAND_PLUMMET
 				case 'n':
 					game.command <- COMMAND_NEW_GAME
 				case 'q':
