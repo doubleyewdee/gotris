@@ -1,6 +1,10 @@
 package main
 
-import "math/rand"
+import (
+	"math/rand"
+
+	"github.com/gdamore/tcell"
+)
 
 type Point struct{ X, Y int }
 
@@ -8,63 +12,84 @@ func (point *Point) Add(offset Point) Point {
 	return Point{point.X + offset.X, point.Y + offset.Y}
 }
 
-type Piece [4]Point
+const (
+	PIECE_I = iota
+	PIECE_J
+	PIECE_L
+	PIECE_O
+	PIECE_S
+	PIECE_T
+	PIECE_Z
+)
+
+var DEFAULT_PIECE_COLOR = tcell.NewRGBColor(128, 48, 192)
+
+type Piece struct {
+	points [4]Point
+	color  tcell.Color
+	id     int
+}
 
 // --X-
 // --X-
 // --X-
 // --X-
-var pieceLongBoi = Piece{Point{0, -2}, Point{0, -1}, Point{0, 0}, Point{0, 1}}
+var pieceI = Piece{points: [4]Point{{0, -2}, {0, -1}, {0, 0}, {0, 1}}, id: PIECE_I}
 
 // ----  ----
 // -X--  --X-
 // -X--  --X-
 // -XX-  -XX-
-var pieceL = Piece{Point{-1, -1}, Point{-1, 0}, Point{-1, 1}, Point{0, 1}}
-var pieceInvertedL = Piece{Point{0, -1}, Point{0, 0}, Point{-1, 1}, Point{0, 1}}
+var pieceL = Piece{points: [4]Point{{-1, -1}, {-1, 0}, {-1, 1}, {0, 1}}, id: PIECE_L}
+var pieceJ = Piece{points: [4]Point{{0, -1}, {0, 0}, {-1, 1}, {0, 1}}, id: PIECE_J}
 
 // ----  ----
 // -X--  --X-
 // -XX-  -XX-
 // --X-  -X--
-var pieceZ = Piece{Point{-1, -1}, Point{-1, 0}, Point{0, 0}, Point{0, 1}}
-var pieceInvertedZ = Piece{Point{0, -1}, Point{-1, 0}, Point{0, 0}, Point{-1, 1}}
+var pieceS = Piece{points: [4]Point{{-1, -1}, {-1, 0}, {0, 0}, {0, 1}}, id: PIECE_S}
+var pieceZ = Piece{points: [4]Point{{0, -1}, {-1, 0}, {0, 0}, {-1, 1}}, id: PIECE_Z}
 
 // ----
 // -XX-
 // -XX-
 // ----
-var pieceBlock = Piece{Point{-1, -1}, Point{0, -1}, Point{-1, 0}, Point{0, 0}}
+var pieceO = Piece{points: [4]Point{{-1, -1}, {0, -1}, {-1, 0}, {0, 0}}, id: PIECE_O}
 
 // ----
 // -X--
 // XXX-
 // ----
-var pieceTBoi = Piece{Point{0, -1}, Point{-1, 0}, Point{0, 0}, Point{1, 0}}
+var pieceT = Piece{points: [4]Point{{0, -1}, {-1, 0}, {0, 0}, {1, 0}}, id: PIECE_T}
 
 func (piece *Piece) RotatePiece(clockwise bool) *Piece {
-	rotated := new(Piece)
-	for i := 0; i < len(piece); i++ {
+	rotated := new([4]Point)
+	for i := 0; i < len(piece.points); i++ {
 		if clockwise == true {
-			rotated[i] = Point{piece[i].Y, -piece[i].X}
+			rotated[i] = Point{piece.points[i].Y, -piece.points[i].X}
 		} else {
-			rotated[i] = Point{-piece[i].Y, piece[i].X}
+			rotated[i] = Point{-piece.points[i].Y, piece.points[i].X}
 		}
 	}
-	return rotated
+	return &Piece{points: *rotated, id: piece.id, color: piece.color}
 }
 
 type BagOfPieces struct {
-	pieces []Piece
-	order  []int
-	next   int
+	pieces   []Piece
+	order    []int
+	next     int
+	colorMap map[int]tcell.Color
 }
 
 func NewBagOfPieces() *BagOfPieces {
-	pieces := []Piece{pieceLongBoi, pieceL, pieceInvertedL, pieceZ, pieceInvertedZ, pieceBlock, pieceTBoi}
-	order := []int{0, 1, 2, 3, 4, 5, 6}
+	pieces := []Piece{pieceI, pieceJ, pieceL, pieceO, pieceS, pieceT, pieceZ}
+	order := []int{PIECE_I, PIECE_J, PIECE_L, PIECE_O, PIECE_S, PIECE_T, PIECE_Z}
+	colorMap := make(map[int]tcell.Color, len(pieces))
+	for _, p := range pieces {
+		colorMap[p.id] = DEFAULT_PIECE_COLOR
+	}
 
-	return &BagOfPieces{pieces: pieces, order: order, next: len(order)}
+	return &BagOfPieces{pieces: pieces, order: order, next: len(order), colorMap: colorMap}
 }
 
 func (bag *BagOfPieces) NextPiece() *Piece {
@@ -80,7 +105,8 @@ func (bag *BagOfPieces) NextPiece() *Piece {
 		bag.next = 0
 	}
 
-	return &bag.pieces[bag.order[bag.next]]
+	piece := bag.pieces[bag.order[bag.next]]
+	return &Piece{points: piece.points, id: piece.id, color: bag.colorMap[piece.id]}
 }
 
 func (bag *BagOfPieces) TakeNextPiece() *Piece {

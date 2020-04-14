@@ -49,9 +49,15 @@ func (board *Board) PlacePiece(piece Piece, position Point) int {
 func (board *Board) LockPiece(piece Piece, position Point) {
 	topY, bottomY := BOARD_HEIGHT, 0
 
+	r, g, b := piece.color.RGB()
+	r -= r / 4
+	g -= g / 4
+	b -= b / 4
+	cellColor := tcell.NewRGBColor(r, g, b)
 	locker := func(point Point) {
 		cell := board.cellAt(point)
 		cell.Locked = true
+		cell.Color = cellColor
 		if point.Y < topY {
 			topY = point.Y
 		}
@@ -149,8 +155,8 @@ func (board *Board) isPiecePositionOverlapped(piece Piece, position Point) bool 
 
 // returns Points relative to the board for the current piece and a flag if one or more points are invalid
 func (board *Board) intersectPiece(piece Piece, position Point, pointOperator func(Point)) {
-	for i := 0; i < len(piece); i++ {
-		pt := piece[i]
+	for i := 0; i < len(piece.points); i++ {
+		pt := piece.points[i]
 		x := position.X + pt.X
 		y := position.Y + pt.Y
 		pointOperator(Point{x, y})

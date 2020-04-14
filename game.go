@@ -9,7 +9,6 @@ import (
 )
 
 const DRAWN_CELL_WIDTH = 2 // 2-width cells look vaguely like a square
-var DRAW_COLOR = tcell.NewRGBColor(128, 48, 192)
 var EMPTY_COLOR = tcell.NewRGBColor(0, 0, 0)
 
 const (
@@ -44,7 +43,20 @@ func NewGame(screen tcell.Screen) Game {
 	g.command = make(chan int)
 	g.boardArea.Height = BOARD_HEIGHT
 	g.boardArea.Width = BOARD_WIDTH * DRAWN_CELL_WIDTH
-	g.advanceSpeed = time.Second / 3
+	g.advanceSpeed = time.Second / 2
+
+	// lazy piece coloring for now
+	white := tcell.NewRGBColor(255, 255, 255)
+	purple := tcell.NewRGBColor(128, 64, 224)
+	blue := tcell.NewRGBColor(64, 64, 224)
+	colors := g.pieceGenerator.colorMap
+	colors[PIECE_I] = white
+	colors[PIECE_O] = white
+	colors[PIECE_T] = white
+	colors[PIECE_J] = purple
+	colors[PIECE_L] = purple
+	colors[PIECE_S] = blue
+	colors[PIECE_Z] = blue
 
 	return *g
 }
@@ -247,15 +259,17 @@ func (game *Game) getInput() {
 }
 
 const (
-	BLOCK_CHAR = '\u2592'
+	BLOCK_CHAR = '\u2588'
+	//BLOCK_CHAR = '🙃' // yep this works lol
 	EMPTY_CHAR = '\u0000'
 )
 
 func (game *Game) draw() {
 	charStyle := tcell.StyleDefault
+	charStyle = charStyle.Background(EMPTY_COLOR)
 	for y := 0; y < BOARD_HEIGHT; y++ {
 		for x := 0; x < BOARD_WIDTH; x++ {
-			charStyle = charStyle.Background(game.board.Cells[y][x].Color)
+			charStyle = charStyle.Foreground(game.board.Cells[y][x].Color)
 			ch := EMPTY_CHAR
 			if game.board.Cells[y][x].Locked {
 				ch = BLOCK_CHAR
@@ -269,12 +283,11 @@ func (game *Game) draw() {
 		}
 	}
 
-	for i := 0; i < len(game.currentPiece); i++ {
-		piece := game.currentPiece[i]
+	for i := 0; i < len(game.currentPiece.points); i++ {
+		piece := game.currentPiece.points[i]
 		x := game.piecePosition.X + piece.X
 		y := game.piecePosition.Y + piece.Y
-		charStyle = charStyle.Background(EMPTY_COLOR)
-		charStyle = charStyle.Foreground(DRAW_COLOR)
+		charStyle = charStyle.Foreground(game.currentPiece.color)
 		for i := 0; i < DRAWN_CELL_WIDTH; i++ {
 			game.screen.SetContent(
 				game.boardArea.X+(x*DRAWN_CELL_WIDTH)+i,
